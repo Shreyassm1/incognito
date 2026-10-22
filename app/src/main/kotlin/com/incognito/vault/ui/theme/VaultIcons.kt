@@ -39,6 +39,7 @@ object VaultIcons {
     val VolumeUp: Painter @Composable get() = painterResource(R.drawable.ic_volume_up)
     val VolumeOff: Painter @Composable get() = painterResource(R.drawable.ic_volume_off)
     val Info: Painter @Composable get() = painterResource(R.drawable.ic_info)
+    val Share: Painter @Composable get() = painterResource(R.drawable.ic_share)
     val Visibility: Painter @Composable get() = painterResource(R.drawable.ic_visibility)
     val VisibilityOff: Painter @Composable get() = painterResource(R.drawable.ic_visibility_off)
 }

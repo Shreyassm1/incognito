@@ -153,6 +153,9 @@ fun MediaViewerScreen(
                     rotationAngle = (rotationAngle + 90f) % 360f
                 },
                 onInfo = { showInfoDialog = true },
+                onShare = {
+                    viewModel.shareItem(context, item)
+                },
                 onExport = {
                     viewModel.exportItem(context, item)
                 },
@@ -485,6 +488,7 @@ private fun ViewerTopBar(
     onBack: () -> Unit,
     onRotate: () -> Unit,
     onInfo: () -> Unit,
+    onShare: () -> Unit,
     onExport: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -523,6 +527,13 @@ private fun ViewerTopBar(
                     Icon(
                         painter = VaultIcons.Info,
                         contentDescription = "Info",
+                        tint = Color.White
+                    )
+                }
+                IconButton(onClick = onShare) {
+                    Icon(
+                        painter = VaultIcons.Share,
+                        contentDescription = "Share",
                         tint = Color.White
                     )
                 }

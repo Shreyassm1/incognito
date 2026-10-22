@@ -74,6 +74,10 @@ class MainActivity : FragmentActivity() {
             viewModel.lock()
         }
 
+        // Set picker mode if invoked via ACTION_GET_CONTENT or ACTION_PICK
+        val isPicker = intent?.action == Intent.ACTION_GET_CONTENT || intent?.action == Intent.ACTION_PICK
+        viewModel.setPickerMode(isPicker)
+
         // Handle incoming share intents (e.g. from WhatsApp, Gallery, etc.)
         handleIncomingShareIntent(intent)
 
@@ -95,6 +99,8 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val isPicker = intent.action == Intent.ACTION_GET_CONTENT || intent.action == Intent.ACTION_PICK
+        viewModel.setPickerMode(isPicker)
         handleIncomingShareIntent(intent)
     }
 
@@ -228,7 +234,8 @@ fun VaultAppContent(viewModel: VaultViewModel) {
                 LockScreen(
                     viewModel = viewModel,
                     onUnlocked = {
-                        navController.navigate(Screen.Camera.route) {
+                        val destination = if (viewModel.isPickerMode.value) Screen.Gallery.route else Screen.Camera.route
+                        navController.navigate(destination) {
                             popUpTo(Screen.Lock.route) { inclusive = true }
                         }
                     }

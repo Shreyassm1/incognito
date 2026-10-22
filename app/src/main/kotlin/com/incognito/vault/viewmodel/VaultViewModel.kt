@@ -1,9 +1,12 @@
 package com.incognito.vault.viewmodel
 
+import android.app.Activity
 import android.app.Application
 import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -428,6 +431,188 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             e.printStackTrace()
             emitToast("Export failed: ${e.message}")
             false
+        }
+    }
+
+    private val _isPickerMode = MutableStateFlow(false)
+    val isPickerMode: StateFlow<Boolean> = _isPickerMode.asStateFlow()
+
+    fun setPickerMode(enabled: Boolean) {
+        _isPickerMode.value = enabled
+    }
+
+    fun shareItem(context: Context, item: VaultMediaItem) {
+        val key = activeMasterKey ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val tempDir = File(context.cacheDir, "shared_temp").apply { mkdirs() }
+                val isPhoto = item.mediaType == MediaType.PHOTO
+                val ext = if (isPhoto) "jpg" else "mp4"
+                val mimeType = if (isPhoto) "image/jpeg" else "video/mp4"
+                val tempFile = File(tempDir, "vault_share_${System.currentTimeMillis()}.$ext")
+
+                tempFile.outputStream().use { out ->
+                    if (isPhoto) {
+                        val encrypted = item.file.readBytes()
+                        val decrypted = VaultCrypto.decryptBuffer(encrypted, key)
+                        try {
+                            out.write(decrypted)
+                        } finally {
+                            VaultCrypto.wipe(decrypted)
+                            VaultCrypto.wipe(encrypted)
+                        }
+                    } else {
+                        VaultCrypto.openSeekableSource(item.file, key).use { source ->
+                            val buffer = ByteArray(64 * 1024)
+                            var read: Int
+                            while (source.read(buffer, 0, buffer.size).also { read = it } != -1) {
+                                out.write(buffer, 0, read)
+                            }
+                        }
+                    }
+                    out.flush()
+                }
+
+                val uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    tempFile
+                )
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mimeType
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                withContext(Dispatchers.Main) {
+                    val chooser = Intent.createChooser(shareIntent, "Share to WhatsApp / Apps")
+                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(chooser)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emitToast("Failed to share: ${e.message}")
+            }
+        }
+    }
+
+    fun shareSelected(context: Context) {
+        val selected = _selectedIds.value
+        val key = activeMasterKey ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val tempDir = File(context.cacheDir, "shared_temp").apply { mkdirs() }
+                val items = _mediaList.value.filter { selected.contains(it.id) }
+                val uris = ArrayList<Uri>()
+
+                items.forEach { item ->
+                    val isPhoto = item.mediaType == MediaType.PHOTO
+                    val ext = if (isPhoto) "jpg" else "mp4"
+                    val tempFile = File(tempDir, "vault_share_${item.id}.$ext")
+                    tempFile.outputStream().use { out ->
+                        if (isPhoto) {
+                            val encrypted = item.file.readBytes()
+                            val decrypted = VaultCrypto.decryptBuffer(encrypted, key)
+                            try {
+                                out.write(decrypted)
+                            } finally {
+                                VaultCrypto.wipe(decrypted)
+                                VaultCrypto.wipe(encrypted)
+                            }
+                        } else {
+                            VaultCrypto.openSeekableSource(item.file, key).use { source ->
+                                val buffer = ByteArray(64 * 1024)
+                                var read: Int
+                                while (source.read(buffer, 0, buffer.size).also { read = it } != -1) {
+                                    out.write(buffer, 0, read)
+                                }
+                            }
+                        }
+                        out.flush()
+                    }
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+                    uris.add(uri)
+                }
+
+                if (uris.isNotEmpty()) {
+                    val shareIntent = if (uris.size == 1) {
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "image/*"
+                            putExtra(Intent.EXTRA_STREAM, uris[0])
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    } else {
+                        Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                            type = "image/*"
+                            putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        val chooser = Intent.createChooser(shareIntent, "Share to WhatsApp / Apps")
+                        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(chooser)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emitToast("Failed to share selected items: ${e.message}")
+            }
+        }
+    }
+
+    fun pickItem(activity: Activity, item: VaultMediaItem) {
+        val key = activeMasterKey ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val tempDir = File(activity.cacheDir, "shared_temp").apply { mkdirs() }
+                val isPhoto = item.mediaType == MediaType.PHOTO
+                val ext = if (isPhoto) "jpg" else "mp4"
+                val tempFile = File(tempDir, "vault_pick_${System.currentTimeMillis()}.$ext")
+
+                tempFile.outputStream().use { out ->
+                    if (isPhoto) {
+                        val encrypted = item.file.readBytes()
+                        val decrypted = VaultCrypto.decryptBuffer(encrypted, key)
+                        try {
+                            out.write(decrypted)
+                        } finally {
+                            VaultCrypto.wipe(decrypted)
+                            VaultCrypto.wipe(encrypted)
+                        }
+                    } else {
+                        VaultCrypto.openSeekableSource(item.file, key).use { source ->
+                            val buffer = ByteArray(64 * 1024)
+                            var read: Int
+                            while (source.read(buffer, 0, buffer.size).also { read = it } != -1) {
+                                out.write(buffer, 0, read)
+                            }
+                        }
+                    }
+                    out.flush()
+                }
+
+                val uri = FileProvider.getUriForFile(
+                    activity,
+                    "${activity.packageName}.fileprovider",
+                    tempFile
+                )
+
+                val resultIntent = Intent().apply {
+                    data = uri
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                withContext(Dispatchers.Main) {
+                    activity.setResult(Activity.RESULT_OK, resultIntent)
+                    activity.finish()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emitToast("Failed to pick item: ${e.message}")
+            }
         }
     }
 

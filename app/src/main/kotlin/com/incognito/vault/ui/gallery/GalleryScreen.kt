@@ -94,6 +94,7 @@ fun GalleryScreen(
     val context = LocalContext.current
     val mediaList by viewModel.mediaList.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
+    val isPickerMode by viewModel.isPickerMode.collectAsState()
     val selectedIds by viewModel.selectedIds.collectAsState()
     var selectedFilter by remember { mutableStateOf(GalleryFilterTab.ALL) }
     var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
@@ -171,12 +172,16 @@ fun GalleryScreen(
                 onExport = {
                     viewModel.exportSelected(context)
                 },
+                onShare = {
+                    viewModel.shareSelected(context)
+                },
                 onImport = {
                     photoPickerLauncher.launch(
                         PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
                     )
                 },
-                onLock = onLockRequested
+                onLock = onLockRequested,
+                isPickerMode = isPickerMode
             )
 
             // Filter Tabs (All, Photos, Videos)
@@ -280,7 +285,12 @@ fun GalleryScreen(
                             isSelected = selectedIds.contains(item.id),
                             isSelectionMode = isSelectionMode,
                             onItemClick = {
-                                if (isSelectionMode) {
+                                if (isPickerMode) {
+                                    val activity = context as? android.app.Activity
+                                    if (activity != null) {
+                                        viewModel.pickItem(activity, item)
+                                    }
+                                } else if (isSelectionMode) {
                                     viewModel.toggleSelectItem(item.id)
                                 } else {
                                     onNavigateToViewer(item.id)
@@ -359,6 +369,7 @@ fun GalleryScreen(
 @Composable
 private fun GalleryTopBar(
     isSelectionMode: Boolean,
+    isPickerMode: Boolean,
     selectedCount: Int,
     totalCount: Int,
     onBack: () -> Unit,
@@ -366,6 +377,7 @@ private fun GalleryTopBar(
     onSelectAll: () -> Unit,
     onDelete: () -> Unit,
     onExport: () -> Unit,
+    onShare: () -> Unit,
     onImport: () -> Unit,
     onLock: () -> Unit
 ) {
@@ -391,13 +403,13 @@ private fun GalleryTopBar(
                 Spacer(modifier = Modifier.width(4.dp))
                 Column {
                     Text(
-                        text = if (isSelectionMode) "$selectedCount SELECTED" else "VAULT GALLERY",
+                        text = if (isPickerMode) "SELECT TO ATTACH" else if (isSelectionMode) "$selectedCount SELECTED" else "VAULT GALLERY",
                         color = VaultTextPrimary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
-                    if (!isSelectionMode) {
+                    if (!isSelectionMode && !isPickerMode) {
                         Text(
                             text = "$totalCount items secured",
                             color = VaultAccent,
@@ -416,6 +428,13 @@ private fun GalleryTopBar(
                             tint = VaultTextPrimary
                         )
                     }
+                    IconButton(onClick = onShare, enabled = selectedCount > 0) {
+                        Icon(
+                            painter = VaultIcons.Share,
+                            contentDescription = "Share Selected",
+                            tint = if (selectedCount > 0) VaultAccent else VaultTextSecondary.copy(alpha = 0.5f)
+                        )
+                    }
                     IconButton(onClick = onExport, enabled = selectedCount > 0) {
                         Icon(
                             painter = VaultIcons.Download,
@@ -430,7 +449,7 @@ private fun GalleryTopBar(
                             tint = if (selectedCount > 0) VaultError else VaultTextSecondary.copy(alpha = 0.5f)
                         )
                     }
-                } else {
+                } else if (!isPickerMode) {
                     IconButton(onClick = onImport) {
                         Icon(
                             painter = VaultIcons.AddPhoto,
