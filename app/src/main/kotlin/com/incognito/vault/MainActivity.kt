@@ -106,13 +106,24 @@ class MainActivity : FragmentActivity() {
 
     private fun handleIncomingShareIntent(intent: Intent?) {
         if (intent == null) return
-        val action = intent.action
-        val type = intent.type ?: return
-
-        if (!type.startsWith("image/") && !type.startsWith("video/")) return
+        val action = intent.action ?: return
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return
 
         val urisToImport = mutableListOf<Uri>()
 
+        // 1. Try clipData first (Standard on Android 10+ sharesheets & WhatsApp)
+        val clipData = intent.clipData
+        if (clipData != null) {
+            for (i in 0 until clipData.itemCount) {
+                clipData.getItemAt(i)?.uri?.let { uri ->
+                    if (!urisToImport.contains(uri)) {
+                        urisToImport.add(uri)
+                    }
+                }
+            }
+        }
+
+        // 2. Try EXTRA_STREAM (single or multiple)
         if (Intent.ACTION_SEND == action) {
             val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -120,7 +131,7 @@ class MainActivity : FragmentActivity() {
                 @Suppress("DEPRECATION")
                 intent.getParcelableExtra(Intent.EXTRA_STREAM)
             }
-            if (streamUri != null) {
+            if (streamUri != null && !urisToImport.contains(streamUri)) {
                 urisToImport.add(streamUri)
             }
         } else if (Intent.ACTION_SEND_MULTIPLE == action) {
@@ -130,16 +141,40 @@ class MainActivity : FragmentActivity() {
                 @Suppress("DEPRECATION")
                 intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)
             }
-            if (!streamUris.isNullOrEmpty()) {
-                urisToImport.addAll(streamUris)
+            streamUris?.forEach { uri ->
+                if (!urisToImport.contains(uri)) {
+                    urisToImport.add(uri)
+                }
             }
         }
 
-        if (urisToImport.isNotEmpty()) {
+        // 3. Filter for valid image/video media
+        val validMediaUris = urisToImport.filter { uri ->
+            val resolvedType = try {
+                contentResolver.getType(uri) ?: intent.type ?: ""
+            } catch (e: Exception) {
+                intent.type ?: ""
+            }
+            resolvedType.startsWith("image/") || resolvedType.startsWith("video/") ||
+                    resolvedType == "*/*" || resolvedType.isEmpty()
+        }
+
+        if (validMediaUris.isNotEmpty()) {
             if (viewModel.isLocked.value) {
-                viewModel.addPendingImports(urisToImport)
+                viewModel.addPendingImports(validMediaUris)
+                Toast.makeText(
+                    this,
+                    "${validMediaUris.size} item(s) queued for Incognito Vault. Unlock to import.",
+                    Toast.LENGTH_LONG
+                ).show()
             } else {
-                viewModel.importMediaFromUris(this, urisToImport) { _ -> }
+                viewModel.importMediaFromUris(this, validMediaUris) { count ->
+                    Toast.makeText(
+                        this,
+                        "Encrypted & secured $count item(s) in vault",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
