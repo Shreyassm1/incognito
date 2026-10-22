@@ -1,7 +1,8 @@
-# Incognito Vault Proguard / R8 Rules
+# Incognito Vault Proguard / R8 Optimization Rules
 
 -dontpreverify
 -allowaccessmodification
+-repackageclasses 'com.incognito.vault.opt'
 
 # Keep line numbers for stack traces
 -renamesourcefileattribute SourceFile
@@ -14,26 +15,17 @@
     volatile <fields>;
 }
 
-# AndroidX Core & Lifecycle
+# AndroidX Core & Lifecycle ViewModels
 -keepclassmembers class * extends androidx.lifecycle.ViewModel {
     <init>(...);
 }
 
-# Media3 / ExoPlayer
--keep class androidx.media3.exoplayer.** { *; }
--keep class androidx.media3.common.** { *; }
--keep class androidx.media3.ui.** { *; }
--dontwarn androidx.media3.**
-
-# CameraX
--keep class androidx.camera.core.** { *; }
--keep class androidx.camera.camera2.** { *; }
--keep class androidx.camera.lifecycle.** { *; }
--keep class androidx.camera.view.** { *; }
--keep class androidx.camera.video.** { *; }
+# CameraX & Media3: Allow R8 tree-shaking while suppressing build warnings
 -dontwarn androidx.camera.**
+-dontwarn androidx.media3.**
+-dontwarn androidx.biometric.**
 
-# Incognito Cryptographic Engine
+# Incognito Cryptographic Engine & Models
 -keep class com.incognito.crypto.** { *; }
 -keep class com.incognito.vault.crypto.** { *; }
 -keep class com.incognito.vault.media.** { *; }
@@ -41,4 +33,3 @@
 
 # Android Biometrics
 -keep class androidx.biometric.** { *; }
--dontwarn androidx.biometric.**

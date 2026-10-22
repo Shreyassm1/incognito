@@ -46,7 +46,10 @@ object ThumbnailCache {
                 var decrypted: ByteArray? = null
                 try {
                     decrypted = VaultCrypto.decryptBuffer(encrypted, key)
-                    val bitmap = BitmapFactory.decodeByteArray(decrypted, 0, decrypted.size)
+                    val decodeOptions = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                    }
+                    val bitmap = BitmapFactory.decodeByteArray(decrypted, 0, decrypted.size, decodeOptions)
                     if (bitmap != null) {
                         put(item.id, bitmap)
                         return@withContext bitmap
@@ -72,6 +75,7 @@ object ThumbnailCache {
                     val sampleSize = calculateInSampleSize(options, 256, 256)
                     val decodeOptions = BitmapFactory.Options().apply {
                         inSampleSize = sampleSize
+                        inPreferredConfig = Bitmap.Config.RGB_565
                     }
                     val bitmap = BitmapFactory.decodeByteArray(decrypted, 0, decrypted.size, decodeOptions)
                     if (bitmap != null) {
