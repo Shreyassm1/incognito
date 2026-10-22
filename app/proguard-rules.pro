@@ -3,6 +3,14 @@
 -dontpreverify
 -allowaccessmodification
 -repackageclasses 'com.incognito.vault.opt'
+-optimizationpasses 5
+
+# Strip Android debug and verbose logs from release binary
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+}
 
 # Keep line numbers for stack traces
 -renamesourcefileattribute SourceFile
@@ -20,16 +28,11 @@
     <init>(...);
 }
 
-# CameraX & Media3: Allow R8 tree-shaking while suppressing build warnings
+# CameraX & Media3: Allow aggressive R8 tree-shaking
 -dontwarn androidx.camera.**
 -dontwarn androidx.media3.**
 -dontwarn androidx.biometric.**
 
-# Incognito Cryptographic Engine & Models
--keep class com.incognito.crypto.** { *; }
--keep class com.incognito.vault.crypto.** { *; }
--keep class com.incognito.vault.media.** { *; }
--keep class com.incognito.vault.model.** { *; }
-
-# Android Biometrics
--keep class androidx.biometric.** { *; }
+# Incognito Cryptographic Engine (Keep essential crypto primitives)
+-keep class com.incognito.crypto.VaultCrypto { *; }
+-keep class com.incognito.vault.crypto.VaultCrypto { *; }

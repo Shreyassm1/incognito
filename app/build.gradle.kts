@@ -66,6 +66,11 @@ android {
             excludes += "/META-INF/*.properties"
             excludes += "DebugProbesKt.bin"
             excludes += "kotlin-tooling-metadata.json"
+            excludes += "META-INF/*.kotlin_module"
+            excludes += "META-INF/DEPENDENCIES"
+            excludes += "META-INF/LICENSE*"
+            excludes += "META-INF/NOTICE*"
+            excludes += "META-INF/*.txt"
         }
         jniLibs {
             useLegacyPackaging = false
